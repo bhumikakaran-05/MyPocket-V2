@@ -1,0 +1,6 @@
+{
+  "name": "MyPocket",
+  "description": "A daily pocket-money planner and expense tracker for students to manage allowance, category budgets, daily safe spending, and savings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

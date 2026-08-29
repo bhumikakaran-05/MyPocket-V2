@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "migratedFromLocal": { "type": "boolean" }
+      },
+      "required": ["id", "email"]
+    },
+    "Month": {
+      "title": "Month Budget",
+      "description": "Monthly allowance and category configurations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "monthlyPocketMoney": { "type": "number" },
+        "categoryBudgets": { "type": "object" },
+        "categoryTypes": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "monthlyPocketMoney"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Individual logged expense item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "monthKey": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "merchant": { "type": "string" },
+        "note": { "type": "string" },
+        "date": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "amount", "category", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "entity": "User",
+      "description": "User profile document"
+    },
+    "/users/{userId}/months/{monthId}": {
+      "entity": "Month",
+      "description": "Monthly allowance and category budgets for a specific month"
+    },
+    "/users/{userId}/months/{monthId}/expenses/{expenseId}": {
+      "entity": "Expense",
+      "description": "Expenses logged for a specific month"
+    }
+  }
+}
