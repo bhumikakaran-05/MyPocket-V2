@@ -28,7 +28,7 @@ import HomeScreen from "./components/HomeScreen";
 import AnalysisView from "./components/AnalysisView";
 import ProfileView from "./components/ProfileView";
 import BottomNavBar, { NavTab } from "./components/BottomNavBar";
-import AuthModal from "./components/AuthModal";
+import AuthModal, { AuthMode } from "./components/AuthModal";
 import MigrationModal from "./components/MigrationModal";
 import { useAuth } from "./context/AuthContext";
 import { 
@@ -61,10 +61,30 @@ export default function App() {
   
   // Auth & Migration Modals
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState<"login" | "signup">("login");
+  const [authModalMode, setAuthModalMode] = useState<AuthMode>("login");
+  const [resetActionCode, setResetActionCode] = useState<string | null>(null);
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const hasCheckedMigrationRef = useRef(false);
+
+  // Check URL query parameters for Firebase Auth action codes (e.g., resetPassword link)
+  useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const modeParam = searchParams.get("mode");
+      const oobCode = searchParams.get("oobCode");
+
+      if (modeParam === "resetPassword" && oobCode) {
+        setResetActionCode(oobCode);
+        setAuthModalMode("reset-confirm");
+        setIsAuthModalOpen(true);
+        // Clean up URL query parameters without reloading
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (e) {
+      console.warn("Could not check URL parameters for auth actions", e);
+    }
+  }, []);
 
   // Real-time Firestore subscription when user is authenticated
   useEffect(() => {
@@ -308,7 +328,7 @@ export default function App() {
     }
   };
 
-  const openAuth = (mode: "login" | "signup") => {
+  const openAuth = (mode: AuthMode = "login") => {
     setAuthModalMode(mode);
     setIsAuthModalOpen(true);
     setShowUserMenu(false);
@@ -600,8 +620,12 @@ export default function App() {
       {/* Auth Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
+        onClose={() => {
+          setIsAuthModalOpen(false);
+          setResetActionCode(null);
+        }}
         initialMode={authModalMode}
+        actionCode={resetActionCode}
       />
 
       {/* Migration Modal */}
