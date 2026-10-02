@@ -55,10 +55,11 @@ export default function PocketMoneyModal({ currentAmount, totalAllocated = 0, on
               <IndianRupee size={14} /> Total Pocket Money
             </label>
             <div className="relative">
-              <span className="absolute left-4 top-3.5 text-2xl font-bold text-slate-400">₹</span>
+              <span className="absolute left-4 top-3 sm:top-3.5 text-2xl font-bold text-slate-400 select-none">₹</span>
               <input
                 type="number"
-                step="1"
+                inputMode="decimal"
+                step="any"
                 min="0"
                 required
                 autoFocus
@@ -68,7 +69,7 @@ export default function PocketMoneyModal({ currentAmount, totalAllocated = 0, on
                   setErrorMessage(null);
                 }}
                 placeholder="8000"
-                className="w-full text-3xl font-black pl-10 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+                className="w-full text-2xl sm:text-3xl font-black pl-10 pr-4 py-3 sm:py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 tracking-tight"
               />
             </div>
             

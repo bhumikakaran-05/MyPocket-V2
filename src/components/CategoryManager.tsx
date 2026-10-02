@@ -361,42 +361,55 @@ export default function CategoryManager({
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
               <Plus size={14} /> Add New Category
             </h3>
-            <div className="space-y-2.5">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Category Name (e.g. Books, Gym)"
-                  value={newCategoryName}
-                  onChange={(e) => {
-                    setNewCategoryName(e.target.value);
-                    setFormError(null);
-                  }}
-                  className="flex-1 px-3.5 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
-                />
-                <div className="relative w-28 sm:w-32">
-                  <span className="absolute left-3 top-2 text-slate-400 text-sm">₹</span>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <div className="sm:col-span-7">
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Category Name
+                  </label>
                   <input
-                    type="number"
-                    min="0"
-                    placeholder="Budget"
-                    value={newCategoryBudget}
+                    type="text"
+                    placeholder="e.g. Books, Gym, Groceries"
+                    value={newCategoryName}
                     onChange={(e) => {
-                      setNewCategoryBudget(e.target.value);
+                      setNewCategoryName(e.target.value);
                       setFormError(null);
                     }}
-                    className="w-full pl-7 pr-3 py-2 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-800"
+                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800"
                   />
+                </div>
+
+                <div className="sm:col-span-5">
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Monthly Budget
+                  </label>
+                  <div className="relative w-full">
+                    <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm select-none">₹</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="any"
+                      placeholder="0"
+                      value={newCategoryBudget}
+                      onChange={(e) => {
+                        setNewCategoryBudget(e.target.value);
+                        setFormError(null);
+                      }}
+                      className="w-full pl-8 pr-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-slate-800 tracking-tight"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
+              <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 pt-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500 font-medium">Type:</span>
-                  <div className="inline-flex bg-white rounded-lg p-0.5 border border-slate-200">
+                  <div className="inline-flex bg-white rounded-lg p-0.5 border border-slate-200 shadow-2xs">
                     <button
                       type="button"
                       onClick={() => setNewCategoryType("variable")}
-                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${
+                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                         newCategoryType === "variable"
                           ? "bg-emerald-600 text-white shadow-xs"
                           : "text-slate-600 hover:text-slate-900"
@@ -407,7 +420,7 @@ export default function CategoryManager({
                     <button
                       type="button"
                       onClick={() => setNewCategoryType("fixed")}
-                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${
+                      className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                         newCategoryType === "fixed"
                           ? "bg-emerald-600 text-white shadow-xs"
                           : "text-slate-600 hover:text-slate-900"
@@ -421,7 +434,7 @@ export default function CategoryManager({
                 <button
                   type="button"
                   onClick={handleAdd}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
                 >
                   <Plus size={15} /> Add Category
                 </button>
@@ -487,13 +500,15 @@ export default function CategoryManager({
 
                           <div className="flex gap-2 items-center">
                             <div className="relative flex-1">
-                              <span className="absolute left-3 top-2 text-slate-400 text-sm">₹</span>
+                              <span className="absolute left-3.5 top-2 text-slate-400 font-bold text-sm select-none">₹</span>
                               <input
                                 type="number"
+                                inputMode="decimal"
                                 min="0"
+                                step="any"
                                 value={editBudget}
                                 onChange={(e) => setEditBudget(e.target.value)}
-                                className="w-full pl-7 pr-3 py-1.5 rounded-xl border border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-bold"
+                                className="w-full pl-8 pr-3.5 py-2 rounded-xl border border-emerald-500 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-bold text-slate-800 tracking-tight shadow-xs"
                                 autoFocus
                                 placeholder="0"
                               />
@@ -501,7 +516,7 @@ export default function CategoryManager({
                             <button 
                               type="button"
                               onClick={() => handleSaveEdit(name)} 
-                              className="p-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors"
+                              className="p-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors shadow-xs active:scale-95 shrink-0"
                               title="Save changes"
                             >
                               <Check size={18} />
@@ -509,7 +524,7 @@ export default function CategoryManager({
                             <button 
                               type="button"
                               onClick={() => setEditingCategory(null)} 
-                              className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors"
+                              className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors active:scale-95 shrink-0"
                               title="Cancel"
                             >
                               <X size={18} />

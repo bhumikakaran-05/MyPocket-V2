@@ -95,16 +95,18 @@ export default function AddExpense({ monthData, onAdd, onClose }: AddExpenseProp
               <IndianRupee size={14} /> Amount
             </label>
             <div className="relative">
-              <span className="absolute left-4 top-3 text-2xl font-bold text-slate-400">₹</span>
+              <span className="absolute left-4 top-3 text-2xl font-bold text-slate-400 select-none">₹</span>
               <input
                 type="number"
-                step="0.5"
+                inputMode="decimal"
+                step="any"
+                min="0.01"
                 required
                 autoFocus
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full text-3xl font-black pl-10 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+                className="w-full text-2xl sm:text-3xl font-black pl-10 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 tracking-tight"
               />
             </div>
 
