@@ -13,6 +13,7 @@ export interface MonthData {
   monthlyPocketMoney: number;
   categoryBudgets: Record<string, number>;
   categoryTypes?: Record<string, CategoryType>;
+  archivedCategories?: string[];
   expenses: Expense[];
 }
 

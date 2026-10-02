@@ -7,35 +7,38 @@ import { format, parseISO } from "date-fns";
 interface WeeklyAnalysisProps {
   monthData: MonthData;
   onClose: () => void;
+  isEmbedded?: boolean;
 }
 
-export default function WeeklyAnalysis({ monthData, onClose }: WeeklyAnalysisProps) {
+export default function WeeklyAnalysis({ monthData, onClose, isEmbedded = false }: WeeklyAnalysisProps) {
   const weekStats: WeekStats = calculateWeekStats(monthData, new Date());
 
   const maxDaily = Math.max(...weekStats.dailySpending.map(d => d.amount), 100);
 
   return (
-    <div className="fixed inset-0 bg-slate-50 z-50 overflow-y-auto">
-      <div className="max-w-2xl mx-auto min-h-screen pb-16">
-        {/* Sticky Header */}
-        <header className="sticky top-0 bg-emerald-600 text-white p-5 sm:p-6 flex items-center justify-between shadow-lg z-10">
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={onClose} 
-              className="p-2 hover:bg-white/20 rounded-full transition-colors active:scale-95"
-            >
-              <ChevronLeft size={24} />
-            </button>
-            <div>
-              <h1 className="text-xl font-bold">Weekly Analysis</h1>
-              <p className="text-emerald-100 text-xs mt-0.5">Current week spending pace & trend</p>
+    <div className={isEmbedded ? "rounded-3xl bg-slate-50 overflow-hidden pb-6" : "fixed inset-0 bg-slate-50 z-50 overflow-y-auto"}>
+      <div className={isEmbedded ? "w-full" : "max-w-2xl mx-auto min-h-screen pb-16"}>
+        {/* Header */}
+        {!isEmbedded && (
+          <header className="sticky top-0 bg-emerald-600 text-white p-5 sm:p-6 flex items-center justify-between shadow-lg z-10">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={onClose} 
+                className="p-2 hover:bg-white/20 rounded-full transition-colors active:scale-95"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold">Weekly Analysis</h1>
+                <p className="text-emerald-100 text-xs mt-0.5">Current week spending pace & trend</p>
+              </div>
             </div>
-          </div>
-          <div className="bg-emerald-700/60 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-emerald-500/30">
-            <Calendar size={14} />
-            <span>This Week</span>
-          </div>
-        </header>
+            <div className="bg-emerald-700/60 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-emerald-500/30">
+              <Calendar size={14} />
+              <span>This Week</span>
+            </div>
+          </header>
+        )}
 
         <div className="p-4 sm:p-6 space-y-6">
           {/* Status Headline Banner */}

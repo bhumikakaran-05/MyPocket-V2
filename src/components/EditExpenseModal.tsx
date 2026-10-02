@@ -1,36 +1,39 @@
 import { useState, FormEvent } from "react";
-import { X, Plus, Calendar, Tag, FileText, Store, IndianRupee } from "lucide-react";
+import { X, Save, Calendar, Tag, FileText, Store, IndianRupee } from "lucide-react";
 import { MonthData, Expense } from "../types";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
-interface AddExpenseProps {
+interface EditExpenseModalProps {
+  expense: Expense;
   monthData: MonthData;
-  onAdd: (expense: Expense) => void;
+  onSave: (updatedExpense: Expense) => void;
   onClose: () => void;
 }
 
-const QUICK_AMOUNTS = [50, 100, 200, 500, 1000];
-
-export default function AddExpense({ monthData, onAdd, onClose }: AddExpenseProps) {
+export default function EditExpenseModal({ expense, monthData, onSave, onClose }: EditExpenseModalProps) {
   const categories = Object.keys(monthData.categoryBudgets || {});
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState(categories[0] || "");
-  const [merchant, setMerchant] = useState("");
-  const [note, setNote] = useState("");
-  const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Ensure the expense's current category is present in the list even if deleted from budgets
+  if (expense.category && !categories.includes(expense.category)) {
+    categories.unshift(expense.category);
+  }
 
-  // Calculate remaining budget in selected category
-  const catBudget = monthData.categoryBudgets?.[category] || 0;
-  const catSpent = (monthData.expenses || [])
-    .filter(e => e.category === category)
-    .reduce((a, b) => a + Number(b.amount), 0);
-  const catRemaining = catBudget - catSpent;
+  const [amount, setAmount] = useState(expense.amount.toString());
+  const [category, setCategory] = useState(expense.category || categories[0] || "");
+  const [merchant, setMerchant] = useState(expense.merchant || "");
+  const [note, setNote] = useState(expense.note || "");
+  const [date, setDate] = useState(() => {
+    try {
+      return format(parseISO(expense.date), "yyyy-MM-dd");
+    } catch {
+      return format(new Date(), "yyyy-MM-dd");
+    }
+  });
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    
+
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       setErrorMessage("Please enter a valid amount greater than ₹0.");
@@ -38,17 +41,22 @@ export default function AddExpense({ monthData, onAdd, onClose }: AddExpenseProp
     }
 
     if (!category) {
-      setErrorMessage("Please select or add a category for this expense.");
+      setErrorMessage("Please select a category.");
       return;
     }
 
-    // Use current time combined with selected date
-    const dateObj = new Date(date);
-    const now = new Date();
-    dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+    // Preserve original timestamp time if same day, or use current time
+    let dateObj = new Date(date);
+    try {
+      const originalDate = parseISO(expense.date);
+      dateObj.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds());
+    } catch {
+      const now = new Date();
+      dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+    }
 
-    const newExpense: Expense = {
-      id: crypto.randomUUID(),
+    const updated: Expense = {
+      ...expense,
       amount: parsedAmount,
       category,
       merchant: merchant.trim() || undefined,
@@ -56,23 +64,18 @@ export default function AddExpense({ monthData, onAdd, onClose }: AddExpenseProp
       date: dateObj.toISOString()
     };
 
-    onAdd(newExpense);
+    onSave(updated);
     onClose();
-  };
-
-  const handleQuickAmount = (val: number) => {
-    const current = parseFloat(amount) || 0;
-    setAmount((current + val).toString());
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-3 sm:p-4 z-50 backdrop-blur-sm">
       <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
-        {/* Modal Header */}
+        {/* Header */}
         <div className="p-5 sm:p-6 bg-emerald-600 text-white flex justify-between items-center shrink-0">
           <div>
-            <h2 className="text-xl font-bold">Add Expense</h2>
-            <p className="text-emerald-100 text-xs mt-0.5">Quick log spending in seconds</p>
+            <h2 className="text-xl font-bold">Edit Expense</h2>
+            <p className="text-emerald-100 text-xs mt-0.5">Update transaction details</p>
           </div>
           <button 
             onClick={onClose} 
@@ -99,6 +102,7 @@ export default function AddExpense({ monthData, onAdd, onClose }: AddExpenseProp
               <input
                 type="number"
                 step="0.5"
+                min="0.01"
                 required
                 autoFocus
                 value={amount}
@@ -107,73 +111,32 @@ export default function AddExpense({ monthData, onAdd, onClose }: AddExpenseProp
                 className="w-full text-3xl font-black pl-10 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
               />
             </div>
-
-            {/* Quick add chips */}
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {QUICK_AMOUNTS.map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => handleQuickAmount(val)}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 transition-colors"
-                >
-                  +{val}
-                </button>
-              ))}
-              {amount && (
-                <button
-                  type="button"
-                  onClick={() => setAmount("")}
-                  className="px-2.5 py-1 bg-rose-50 border border-rose-200 text-rose-600 rounded-lg text-xs font-semibold hover:bg-rose-100"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
           </div>
 
           {/* Category selection */}
           <div className="space-y-1.5">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Tag size={14} /> Category
-              </label>
-              {catBudget > 0 && (
-                <span className={`text-[11px] font-semibold ${catRemaining >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {catRemaining >= 0 ? `₹${catRemaining.toLocaleString()} budget left` : `Over by ₹${Math.abs(catRemaining).toLocaleString()}`}
-                </span>
-              )}
-            </div>
-            
-            {/* Quick Category Chips */}
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Tag size={14} /> Category
+            </label>
             <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded-xl border border-slate-200">
-              {categories.length === 0 ? (
-                <p className="text-xs text-slate-500 p-2 italic w-full text-center">
-                  No active categories in this month. Create one in Manage Budgets first.
-                </p>
-              ) : (
-                categories.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => {
-                      setCategory(c);
-                      setErrorMessage(null);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      category === c
-                        ? "bg-emerald-600 text-white shadow-xs scale-102"
-                        : "bg-white text-slate-700 border border-slate-200 hover:border-emerald-300"
-                    }`}
-                  >
-                    {c}
-                  </button>
-                ))
-              )}
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCategory(c)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    category === c
+                      ? "bg-emerald-600 text-white shadow-xs scale-102"
+                      : "bg-white text-slate-700 border border-slate-200 hover:border-emerald-300"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Merchant / Vendor (Optional) */}
+          {/* Merchant / Vendor */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <Store size={14} /> Paid To / Merchant <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
@@ -201,7 +164,7 @@ export default function AddExpense({ monthData, onAdd, onClose }: AddExpenseProp
             />
           </div>
 
-          {/* Note (Optional) */}
+          {/* Note */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <FileText size={14} /> Note <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
@@ -221,7 +184,7 @@ export default function AddExpense({ monthData, onAdd, onClose }: AddExpenseProp
               type="submit"
               className="w-full bg-emerald-600 text-white py-3.5 rounded-2xl font-bold text-base hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 active:scale-95"
             >
-              <Plus size={18} /> Save Expense
+              <Save size={18} /> Update Expense
             </button>
           </div>
         </form>

@@ -7,9 +7,10 @@ import { format, parseISO } from "date-fns";
 interface YearSummaryProps {
   data: AppData;
   onClose: () => void;
+  isEmbedded?: boolean;
 }
 
-export default function YearSummary({ data, onClose }: YearSummaryProps) {
+export default function YearSummary({ data, onClose, isEmbedded = false }: YearSummaryProps) {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   
   const years = Array.from(new Set(Object.keys(data.months).map(m => m.split("-")[0])));
@@ -77,31 +78,47 @@ export default function YearSummary({ data, onClose }: YearSummaryProps) {
   });
 
   return (
-    <div className="fixed inset-0 bg-slate-50 z-50 overflow-y-auto">
-      <div className="max-w-2xl mx-auto min-h-screen pb-16">
+    <div className={isEmbedded ? "rounded-3xl bg-slate-50 overflow-hidden pb-6" : "fixed inset-0 bg-slate-50 z-50 overflow-y-auto"}>
+      <div className={isEmbedded ? "w-full" : "max-w-2xl mx-auto min-h-screen pb-16"}>
         {/* Header */}
-        <header className="sticky top-0 bg-emerald-600 text-white p-5 sm:p-6 flex items-center justify-between shadow-lg z-10">
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={onClose} 
-              className="p-2 hover:bg-white/20 rounded-full transition-colors active:scale-95"
-            >
-              <ChevronLeft size={24} />
-            </button>
-            <div>
-              <h1 className="text-xl font-bold">Annual Year Summary</h1>
-              <p className="text-emerald-100 text-xs mt-0.5">Yearly spending & savings trajectory</p>
+        {!isEmbedded ? (
+          <header className="sticky top-0 bg-emerald-600 text-white p-5 sm:p-6 flex items-center justify-between shadow-lg z-10">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={onClose} 
+                className="p-2 hover:bg-white/20 rounded-full transition-colors active:scale-95"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold">Annual Year Summary</h1>
+                <p className="text-emerald-100 text-xs mt-0.5">Yearly spending & savings trajectory</p>
+              </div>
             </div>
-          </div>
 
-          <select 
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl border border-emerald-500/40 focus:outline-none"
-          >
-            {years.map(y => <option key={y} value={y} className="bg-slate-800 text-white">{y}</option>)}
-          </select>
-        </header>
+            <select 
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl border border-emerald-500/40 focus:outline-none"
+            >
+              {years.map(y => <option key={y} value={y} className="bg-slate-800 text-white">{y}</option>)}
+            </select>
+          </header>
+        ) : (
+          <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200/80 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">Annual Summary</h2>
+              <p className="text-xs text-slate-400">Yearly spending & trends</p>
+            </div>
+            <select 
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="bg-slate-100 text-slate-800 font-bold text-xs px-3 py-1.5 rounded-xl border border-slate-200 focus:outline-none"
+            >
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+        )}
 
         <div className="p-4 sm:p-6 space-y-6">
           {/* Main 4 Metric Cards */}
@@ -177,8 +194,8 @@ export default function YearSummary({ data, onClose }: YearSummaryProps) {
               </div>
             </div>
 
-            <div className="h-[280px] w-full">
-              <ResponsiveContainer width="100%" height="100%" minHeight={280}>
+            <div className="h-[280px] w-full min-w-0" style={{ minHeight: "280px" }}>
+              <ResponsiveContainer width="100%" height={280} minWidth={0}>
                 <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis 

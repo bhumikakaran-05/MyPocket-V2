@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, Calendar, PiggyBank, TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, ShieldCheck, Tag, ArrowUpRight, ArrowDownRight, Layers } from "lucide-react";
+import { ChevronLeft, Calendar, PiggyBank, TrendingDown, TrendingUp, AlertTriangle, CheckCircle2, ShieldCheck, Tag, ArrowUpRight, ArrowDownRight, Layers, GraduationCap } from "lucide-react";
 import { AppData } from "../types";
 import { calculateMonthAnalysis, calculateMonthStats } from "../utils/calculations";
 import { format, parseISO } from "date-fns";
@@ -8,9 +8,10 @@ interface MonthlyAnalysisProps {
   data: AppData;
   activeMonthKey: string;
   onClose: () => void;
+  isEmbedded?: boolean;
 }
 
-export default function MonthlyAnalysis({ data, activeMonthKey, onClose }: MonthlyAnalysisProps) {
+export default function MonthlyAnalysis({ data, activeMonthKey, onClose, isEmbedded = false }: MonthlyAnalysisProps) {
   const [selectedMonth, setSelectedMonth] = useState(activeMonthKey);
 
   const availableMonths = Object.keys(data.months).sort((a, b) => b.localeCompare(a));
@@ -23,36 +24,56 @@ export default function MonthlyAnalysis({ data, activeMonthKey, onClose }: Month
   const stats = calculateMonthStats(monthData, selectedMonth);
 
   return (
-    <div className="fixed inset-0 bg-slate-50 z-50 overflow-y-auto">
-      <div className="max-w-2xl mx-auto min-h-screen pb-16">
+    <div className={isEmbedded ? "rounded-3xl bg-slate-50 overflow-hidden pb-6" : "fixed inset-0 bg-slate-50 z-50 overflow-y-auto"}>
+      <div className={isEmbedded ? "w-full" : "max-w-2xl mx-auto min-h-screen pb-16"}>
         {/* Sticky Header */}
-        <header className="sticky top-0 bg-emerald-600 text-white p-5 sm:p-6 flex items-center justify-between shadow-lg z-10">
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={onClose} 
-              className="p-2 hover:bg-white/20 rounded-full transition-colors active:scale-95"
-            >
-              <ChevronLeft size={24} />
-            </button>
-            <div>
-              <h1 className="text-xl font-bold">Monthly Deep Dive</h1>
-              <p className="text-emerald-100 text-xs mt-0.5">Comprehensive review & savings breakdown</p>
+        {!isEmbedded ? (
+          <header className="sticky top-0 bg-emerald-600 text-white p-5 sm:p-6 flex items-center justify-between shadow-lg z-10">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={onClose} 
+                className="p-2 hover:bg-white/20 rounded-full transition-colors active:scale-95"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold">Monthly Deep Dive</h1>
+                <p className="text-emerald-100 text-xs mt-0.5">Comprehensive review & savings breakdown</p>
+              </div>
             </div>
-          </div>
 
-          {/* Month Dropdown Selector */}
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl border border-emerald-500/40 focus:outline-none"
-          >
-            {availableMonths.map(m => (
-              <option key={m} value={m} className="bg-slate-800 text-white">
-                {format(parseISO(`${m}-01`), "MMM yyyy")}
-              </option>
-            ))}
-          </select>
-        </header>
+            {/* Month Dropdown Selector */}
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl border border-emerald-500/40 focus:outline-none"
+            >
+              {availableMonths.map(m => (
+                <option key={m} value={m} className="bg-slate-800 text-white">
+                  {format(parseISO(`${m}-01`), "MMM yyyy")}
+                </option>
+              ))}
+            </select>
+          </header>
+        ) : (
+          <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200/80 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">Monthly Analysis</h2>
+              <p className="text-xs text-slate-400">Review metrics for selected month</p>
+            </div>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-slate-100 text-slate-800 font-bold text-xs px-3 py-1.5 rounded-xl border border-slate-200 focus:outline-none"
+            >
+              {availableMonths.map(m => (
+                <option key={m} value={m}>
+                  {format(parseISO(`${m}-01`), "MMM yyyy")}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="p-4 sm:p-6 space-y-6">
           {/* Main Key Figures Grid */}
@@ -188,6 +209,82 @@ export default function MonthlyAnalysis({ data, activeMonthKey, onClose }: Month
               <span className="text-[11px] text-slate-400 mt-0.5 block">
                 {analysis.highestCategory ? `₹${analysis.highestCategory.amount.toLocaleString()}` : "₹0 spent"}
               </span>
+            </div>
+          </div>
+
+          {/* Key Takeaways & Student Lessons for Next Month */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-3xl shadow-md space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
+                <GraduationCap size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold">What to Learn for Next Month</h3>
+                <p className="text-xs text-slate-400">Actionable advice based on this month's spending patterns</p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              {/* Overspending insight */}
+              {analysis.overspentCategories.length > 0 ? (
+                <div className="p-3 bg-white/10 rounded-2xl border border-white/10 space-y-1">
+                  <div className="flex items-center gap-1.5 text-amber-300 font-bold">
+                    <AlertTriangle size={14} />
+                    <span>Budget Adjustment Recommended</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">
+                    You exceeded your budget in {analysis.overspentCategories.map(c => `${c.name} (+₹${c.overspent.toLocaleString()})`).join(', ')}. 
+                    Next month, consider adjusting these category allocations upward or setting weekly sub-limits.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-white/10 rounded-2xl border border-white/10 space-y-1">
+                  <div className="flex items-center gap-1.5 text-emerald-300 font-bold">
+                    <CheckCircle2 size={14} />
+                    <span>Disciplined Budget Adherence</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">
+                    Great job! You stayed strictly within your category allocations this month. You can replicate this budget template for next month.
+                  </p>
+                </div>
+              )}
+
+              {/* Fixed vs Variable insight */}
+              {stats.fixedBudget > 0 && (
+                <div className="p-3 bg-white/10 rounded-2xl border border-white/10 space-y-1">
+                  <div className="flex items-center gap-1.5 text-sky-300 font-bold">
+                    <Layers size={14} />
+                    <span>Fixed Obligations Day 1 Strategy</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">
+                    Your fixed commitments (Rent, Bills, WiFi) required ₹{stats.fixedSpent.toLocaleString()} ({Math.round(stats.totalBudget > 0 ? (stats.fixedSpent / stats.totalBudget) * 100 : 0)}% of your pocket money). 
+                    Always set this amount aside immediately on the 1st of the month before discretionary spending.
+                  </p>
+                </div>
+              )}
+
+              {/* Savings & Surplus lesson */}
+              {analysis.savings > 0 ? (
+                <div className="p-3 bg-white/10 rounded-2xl border border-white/10 space-y-1">
+                  <div className="flex items-center gap-1.5 text-emerald-300 font-bold">
+                    <PiggyBank size={14} />
+                    <span>Surplus Capital</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">
+                    You generated a surplus of ₹{analysis.savings.toLocaleString()}! You can allocate a ₹{Math.round(analysis.savings * 0.5).toLocaleString()} buffer into next month's unallocated reserve or keep it as an emergency fund.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-white/10 rounded-2xl border border-white/10 space-y-1">
+                  <div className="flex items-center gap-1.5 text-rose-300 font-bold">
+                    <AlertTriangle size={14} />
+                    <span>Allowance Deficit Recovery</span>
+                  </div>
+                  <p className="text-slate-300 leading-relaxed">
+                    Spending exceeded your allowance by ₹{Math.abs(analysis.remaining).toLocaleString()}. For next month, focus on curbing variable categories (Food, Entertainment) early in the first 10 days.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

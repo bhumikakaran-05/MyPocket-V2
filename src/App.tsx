@@ -3,31 +3,31 @@ import {
   Plus, 
   Settings, 
   BarChart3, 
-  CalendarDays, 
-  PieChart, 
-  Edit3, 
-  Sparkles, 
   LogIn, 
   LogOut, 
   Cloud, 
-  CloudCheck,
   User as UserIcon,
-  ChevronRight,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  Edit3,
+  Receipt,
+  Sliders,
+  ArrowRight
 } from "lucide-react";
 import { AppData, MonthData, Expense } from "./types";
 import { getInitialData, saveData, getMonthData, updateMonthData, clearAllData } from "./storage/storage";
 import { calculateMonthStats, getProgressBarColor, getProgressBarTextColor, generateSmartInsights } from "./utils/calculations";
 import MonthSelector from "./components/MonthSelector";
 import AddExpense from "./components/AddExpense";
+import EditExpenseModal from "./components/EditExpenseModal";
 import CategoryManager from "./components/CategoryManager";
-import YearSummary from "./components/YearSummary";
-import WeeklyAnalysis from "./components/WeeklyAnalysis";
-import MonthlyAnalysis from "./components/MonthlyAnalysis";
 import PocketMoneyModal from "./components/PocketMoneyModal";
 import ResetConfirmationModal from "./components/ResetConfirmationModal";
-import SmartInsightsSection from "./components/SmartInsightsSection";
 import ExpenseHistory from "./components/ExpenseHistory";
+import HomeScreen from "./components/HomeScreen";
+import AnalysisView from "./components/AnalysisView";
+import ProfileView from "./components/ProfileView";
+import BottomNavBar, { NavTab } from "./components/BottomNavBar";
 import AuthModal from "./components/AuthModal";
 import MigrationModal from "./components/MigrationModal";
 import { useAuth } from "./context/AuthContext";
@@ -35,26 +35,27 @@ import {
   subscribeToUserAppData, 
   saveMonthBudget, 
   addExpense as addExpenseToCloud, 
+  updateExpense as updateExpenseInCloud,
   deleteExpense as deleteExpenseFromCloud,
+  reassignCategoryExpenses,
   resetUserDataInFirestore,
   hasCloudData
 } from "./firebase/firestoreService";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 
 export default function App() {
   const { user, loading: authLoading, logout } = useAuth();
   
   const [data, setData] = useState<AppData>(getInitialData);
   const [activeMonthKey, setActiveMonthKey] = useState<string>(() => format(new Date(), "yyyy-MM"));
+  const [activeTab, setActiveTab] = useState<NavTab>("home");
   const [isSyncing, setIsSyncing] = useState(false);
   const [cloudError, setCloudError] = useState<string | null>(null);
 
   // Modals state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
-  const [isYearSummaryOpen, setIsYearSummaryOpen] = useState(false);
-  const [isWeeklyAnalysisOpen, setIsWeeklyAnalysisOpen] = useState(false);
-  const [isMonthlyAnalysisOpen, setIsMonthlyAnalysisOpen] = useState(false);
   const [isPocketMoneyModalOpen, setIsPocketMoneyModalOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   
@@ -143,7 +144,8 @@ export default function App() {
           activeMonthKey,
           newMonthData.monthlyPocketMoney,
           newMonthData.categoryBudgets,
-          newMonthData.categoryTypes
+          newMonthData.categoryTypes,
+          newMonthData.archivedCategories
         );
       } catch (err: any) {
         setCloudError(err.message);
@@ -173,9 +175,35 @@ export default function App() {
           activeMonthKey,
           currentMonthData.monthlyPocketMoney,
           currentMonthData.categoryBudgets,
-          currentMonthData.categoryTypes
+          currentMonthData.categoryTypes,
+          currentMonthData.archivedCategories
         );
         await addExpenseToCloud(user.uid, activeMonthKey, expense);
+      } catch (err: any) {
+        setCloudError(err.message);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+  };
+
+  const handleEditExpense = async (updatedExpense: Expense) => {
+    const updatedExpenses = (currentMonthData.expenses || []).map(e => 
+      e.id === updatedExpense.id ? updatedExpense : e
+    );
+    const updatedMonth = {
+      ...currentMonthData,
+      expenses: updatedExpenses
+    };
+    
+    // Optimistic local update
+    setData(prev => updateMonthData(prev, activeMonthKey, updatedMonth));
+
+    // Cloud update if logged in
+    if (user) {
+      try {
+        setIsSyncing(true);
+        await updateExpenseInCloud(user.uid, activeMonthKey, updatedExpense);
       } catch (err: any) {
         setCloudError(err.message);
       } finally {
@@ -215,6 +243,46 @@ export default function App() {
     await handleUpdateMonth(updatedMonth);
   };
 
+  const handleReassignExpenses = async (fromCategory: string, toCategory: string) => {
+    const updatedExpenses = (currentMonthData.expenses || []).map(e => 
+      e.category === fromCategory ? { ...e, category: toCategory } : e
+    );
+    const newBudgets = { ...currentMonthData.categoryBudgets };
+    delete newBudgets[fromCategory];
+    const newTypes = { ...(currentMonthData.categoryTypes || {}) };
+    delete newTypes[fromCategory];
+
+    const updatedMonth: MonthData = {
+      ...currentMonthData,
+      expenses: updatedExpenses,
+      categoryBudgets: newBudgets,
+      categoryTypes: newTypes
+    };
+
+    // Optimistic local update
+    setData(prev => updateMonthData(prev, activeMonthKey, updatedMonth));
+
+    // Cloud update if logged in
+    if (user) {
+      try {
+        setIsSyncing(true);
+        await reassignCategoryExpenses(user.uid, activeMonthKey, fromCategory, toCategory);
+        await saveMonthBudget(
+          user.uid,
+          activeMonthKey,
+          updatedMonth.monthlyPocketMoney,
+          updatedMonth.categoryBudgets,
+          updatedMonth.categoryTypes,
+          updatedMonth.archivedCategories
+        );
+      } catch (err: any) {
+        setCloudError(err.message);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+  };
+
   const handleResetAll = async () => {
     if (user) {
       try {
@@ -236,7 +304,7 @@ export default function App() {
     if (actionText.includes("Allowance") || actionText.includes("Pocket")) {
       setIsPocketMoneyModalOpen(true);
     } else if (actionText.includes("Categories") || actionText.includes("Budgets") || actionText.includes("Adjust")) {
-      setIsCategoryManagerOpen(true);
+      setActiveTab("budget");
     }
   };
 
@@ -269,27 +337,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Action controls & Auth Menu */}
+          {/* Quick Header Actions */}
           <div className="flex items-center gap-1.5">
-            {/* Year Summary */}
-            <button
-              onClick={() => setIsYearSummaryOpen(true)}
-              className="p-2 hover:bg-white/20 rounded-xl transition-colors text-white active:scale-95 flex items-center gap-1 text-xs font-bold bg-emerald-700/60 px-2.5"
-              title="Year Summary"
-            >
-              <BarChart3 size={16} />
-              <span className="hidden sm:inline">Year</span>
-            </button>
-
-            {/* Category Budgets */}
-            <button
-              onClick={() => setIsCategoryManagerOpen(true)}
-              className="p-2 hover:bg-white/20 rounded-xl transition-colors text-white active:scale-95"
-              title="Category Budgets"
-            >
-              <Settings size={20} />
-            </button>
-
             {/* Auth Pill / User Profile */}
             {authLoading ? (
               <div className="w-8 h-8 flex items-center justify-center">
@@ -324,9 +373,19 @@ export default function App() {
                     <button
                       onClick={() => {
                         setShowUserMenu(false);
+                        setActiveTab("profile");
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                    >
+                      <UserIcon size={14} /> Profile & Settings
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
                         logout();
                       }}
-                      className="w-full text-left px-3 py-2 mt-1 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors"
+                      className="w-full text-left px-3 py-2 mt-1 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors border-t border-slate-100"
                     >
                       <LogOut size={14} /> Log Out
                     </button>
@@ -366,7 +425,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Cloud Sync Activity / Error Banner */}
+      {/* Cloud Sync Error Banner */}
       {cloudError && (
         <div className="bg-rose-50 border-b border-rose-200 px-4 py-2 text-xs text-rose-800">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
@@ -376,251 +435,120 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Container */}
+      {/* Main Body per Active Tab */}
       <main className="max-w-2xl mx-auto p-4 sm:p-5 space-y-4">
-        {/* Month Selector */}
-        <MonthSelector 
-          currentMonth={activeMonthKey} 
-          onMonthChange={setActiveMonthKey} 
-        />
+        {/* ==================== HOME TAB ==================== */}
+        {activeTab === "home" && (
+          <HomeScreen
+            monthData={currentMonthData}
+            stats={stats}
+            activeMonthKey={activeMonthKey}
+            onMonthChange={setActiveMonthKey}
+            onOpenPocketMoney={() => setIsPocketMoneyModalOpen(true)}
+            onNavigateToTab={(tab) => setActiveTab(tab)}
+          />
+        )}
 
-        {/* Quick Analytical Navigation Pills */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => setIsWeeklyAnalysisOpen(true)}
-            className="p-2.5 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-emerald-300 transition-all flex items-center justify-between text-left group active:scale-98"
-          >
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-teal-50 text-teal-700 rounded-lg group-hover:bg-teal-100 transition-colors">
-                <CalendarDays size={16} />
-              </div>
-              <div>
-                <span className="text-xs font-bold text-slate-800 block">Weekly Pace</span>
-                <span className="text-[10px] text-slate-400">7-day breakdown</span>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-          </button>
+        {/* ==================== EXPENSES TAB (Dedicated Full Transaction History) ==================== */}
+        {activeTab === "expenses" && (
+          <div className="space-y-4">
+            <MonthSelector 
+              currentMonth={activeMonthKey} 
+              onMonthChange={setActiveMonthKey} 
+            />
 
-          <button
-            onClick={() => setIsMonthlyAnalysisOpen(true)}
-            className="p-2.5 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-emerald-300 transition-all flex items-center justify-between text-left group active:scale-98"
-          >
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-purple-50 text-purple-700 rounded-lg group-hover:bg-purple-100 transition-colors">
-                <PieChart size={16} />
-              </div>
-              <div>
-                <span className="text-xs font-bold text-slate-800 block">Monthly Analysis</span>
-                <span className="text-[10px] text-slate-400">Savings & trends</span>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
-
-        {/* Primary Pocket Money Dashboard Card */}
-        <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-xs border border-slate-200/90 space-y-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                Monthly Allowance
-              </span>
-              <button
-                onClick={() => setIsPocketMoneyModalOpen(true)}
-                className="group flex items-center gap-2 text-left mt-0.5 hover:opacity-80 transition-opacity"
-              >
-                <h2 className="text-3xl sm:text-4xl font-black text-slate-800 tracking-tight">
-                  ₹{stats.totalBudget.toLocaleString()}
-                </h2>
-                <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition-colors">
-                  <Edit3 size={16} />
-                </div>
-              </button>
-            </div>
-
-            <div className="text-right">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                Real Remaining
-              </span>
-              <p className={`text-2xl sm:text-3xl font-black mt-0.5 ${stats.remainingBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                ₹{stats.remainingBalance.toLocaleString()}
-              </p>
-            </div>
-          </div>
-
-          {/* Allocation & Spending Sub-metrics */}
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60 text-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Spent</span>
-              <span className="text-sm font-black text-slate-800">₹{stats.totalSpent.toLocaleString()}</span>
-            </div>
-
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60 text-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Allocated</span>
-              <span className={`text-sm font-black ${stats.isOverAllocated ? 'text-rose-600' : 'text-emerald-700'}`}>
-                ₹{stats.totalAllocated.toLocaleString()}
-              </span>
-            </div>
-
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60 text-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Unallocated</span>
-              <span className={`text-sm font-black ${stats.unallocated < 0 ? 'text-rose-600' : 'text-slate-700'}`}>
-                {stats.unallocated < 0 ? `-₹${Math.abs(stats.unallocated).toLocaleString()}` : `₹${stats.unallocated.toLocaleString()}`}
-              </span>
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex justify-between text-xs font-semibold">
-              <span className="text-slate-500">Allowance Consumed</span>
-              <span className={getProgressBarTextColor(stats.spentPercentage)}>
-                {Math.round(stats.spentPercentage)}%
-              </span>
-            </div>
-            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(stats.spentPercentage)}`}
-                style={{ width: `${Math.min(100, stats.spentPercentage)}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Signature "Safe to Spend Today" Card */}
-        {stats.isCurrentMonth && stats.totalBudget > 0 && (
-          <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-3xl p-5 shadow-sm space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-white/20 rounded-xl">
-                  <Sparkles size={20} className="text-white" />
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-100 block">
-                    Daily Safe Spending
-                  </span>
-                  <h3 className="text-2xl font-black">
-                    ₹{stats.safeToSpendToday.toLocaleString()} <span className="text-xs font-medium text-emerald-100">/ day</span>
-                  </h3>
-                </div>
-              </div>
-
-              <div className="text-right bg-white/15 px-3 py-1.5 rounded-xl border border-white/20">
-                <span className="text-xs font-black block">{stats.daysRemaining} days left</span>
-                <span className="text-[10px] text-emerald-100">in {format(new Date(), "MMMM")}</span>
-              </div>
-            </div>
-            <p className="text-xs text-emerald-100 pt-1 leading-relaxed">
-              Spend up to this amount daily over the remaining days to finish the month safely without exceeding your allowance.
-            </p>
+            <ExpenseHistory
+              expenses={currentMonthData.expenses || []}
+              categories={Object.keys(currentMonthData.categoryBudgets || {})}
+              activeMonthKey={activeMonthKey}
+              onMonthChange={setActiveMonthKey}
+              onDeleteExpense={handleDeleteExpense}
+              onEditExpense={(exp) => setEditingExpense(exp)}
+              onQuickAdd={() => setIsAddExpenseOpen(true)}
+              isStandaloneScreen={true}
+            />
           </div>
         )}
 
-        {/* Smart Rule-Based Insights & Alerts */}
-        <SmartInsightsSection 
-          insights={smartInsights} 
-          onActionClick={handleInsightAction} 
-        />
+        {/* ==================== BUDGET TAB (Category Budgets & Planner) ==================== */}
+        {activeTab === "budget" && (
+          <div className="space-y-4">
+            <MonthSelector 
+              currentMonth={activeMonthKey} 
+              onMonthChange={setActiveMonthKey} 
+            />
 
-        {/* Category Breakdown Section */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Category Budgets ({stats.categoryStats.length})
-            </h3>
-            <button
-              onClick={() => setIsCategoryManagerOpen(true)}
-              className="text-xs font-bold text-emerald-700 hover:text-emerald-800 transition-colors flex items-center gap-1"
-            >
-              <Settings size={13} />
-              <span>Manage Budgets</span>
-            </button>
+            <CategoryManager
+              monthData={currentMonthData}
+              prevMonthData={prevMonthData}
+              prevMonthName={format(parseISO(`${prevMonthKey}-01`), "MMMM")}
+              onUpdate={handleUpdateMonth}
+              onReassignExpenses={handleReassignExpenses}
+              onClose={() => setActiveTab("home")}
+              onResetAll={() => setIsResetConfirmOpen(true)}
+              isEmbedded={true}
+            />
           </div>
+        )}
 
-          <div className="grid grid-cols-1 gap-2.5">
-            {stats.categoryStats.length === 0 ? (
-              <div className="p-8 bg-white rounded-2xl text-center text-slate-400 border border-slate-200">
-                <p className="text-sm font-medium">No categories created for this month.</p>
-                <button
-                  onClick={() => setIsCategoryManagerOpen(true)}
-                  className="mt-2 text-xs font-bold text-emerald-600 underline"
-                >
-                  Create Categories
-                </button>
-              </div>
-            ) : (
-              stats.categoryStats.map((cat) => {
-                return (
-                  <div
-                    key={cat.name}
-                    className="p-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs space-y-2.5 hover:border-emerald-200 transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-800 text-sm">{cat.name}</span>
-                        <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                          cat.type === "fixed"
-                            ? "bg-blue-50 text-blue-700 border border-blue-100"
-                            : "bg-purple-50 text-purple-700 border border-purple-100"
-                        }`}>
-                          {cat.type}
-                        </span>
-                      </div>
+        {/* ==================== ANALYSIS TAB ==================== */}
+        {activeTab === "analysis" && (
+          <div className="space-y-4">
+            <MonthSelector 
+              currentMonth={activeMonthKey} 
+              onMonthChange={setActiveMonthKey} 
+            />
 
-                      <div className="text-right">
-                        <span className="text-sm font-black text-slate-800">
-                          ₹{cat.spent.toLocaleString()}
-                        </span>
-                        <span className="text-xs text-slate-400 font-medium"> / ₹{cat.budget.toLocaleString()}</span>
-                      </div>
-                    </div>
+            <AnalysisView
+              data={data}
+              monthData={currentMonthData}
+              activeMonthKey={activeMonthKey}
+              stats={stats}
+              smartInsights={smartInsights}
+              prevMonthData={prevMonthData}
+              prevMonthName={format(parseISO(`${prevMonthKey}-01`), "MMMM")}
+              onActionClick={handleInsightAction}
+              onNavigateToTab={(tab) => setActiveTab(tab)}
+            />
+          </div>
+        )}
 
-                    {/* Progress Bar */}
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${getProgressBarColor(cat.percentage)}`}
-                        style={{ width: `${Math.min(100, cat.percentage)}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs">
-                      <span className={`font-semibold ${cat.remaining >= 0 ? 'text-slate-500' : 'text-rose-600'}`}>
-                        {cat.remaining >= 0 
-                          ? `₹${cat.remaining.toLocaleString()} left` 
-                          : `Overspent by ₹${Math.abs(cat.remaining).toLocaleString()}`}
-                      </span>
-                      <span className={`font-bold ${getProgressBarTextColor(cat.percentage)}`}>
-                        {Math.round(cat.percentage)}% used
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
+        {/* ==================== PROFILE TAB ==================== */}
+        {activeTab === "profile" && (
+          <ProfileView
+            user={user}
+            onOpenAuth={openAuth}
+            onLogout={logout}
+            onResetAll={() => setIsResetConfirmOpen(true)}
+            onOpenMigration={() => setIsMigrationModalOpen(true)}
+            hasLocalDataToMigrate={Boolean(
+              getInitialData() && 
+              getInitialData().months && 
+              Object.keys(getInitialData().months).length > 0
             )}
-          </div>
-        </div>
-
-        {/* Filterable & Searchable Expense History */}
-        <ExpenseHistory
-          expenses={currentMonthData.expenses || []}
-          categories={Object.keys(currentMonthData.categoryBudgets || {})}
-          onDeleteExpense={handleDeleteExpense}
-        />
+          />
+        )}
       </main>
 
-      {/* Floating Action Button for Add Expense */}
-      <div className="fixed bottom-6 right-6 z-40">
+      {/* Floating Action Button for Quick Add Expense */}
+      <div className="fixed bottom-20 right-5 z-40">
         <button
           onClick={() => setIsAddExpenseOpen(true)}
-          className="p-4 bg-emerald-600 text-white rounded-full shadow-xl shadow-emerald-700/30 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center group"
+          className="p-3.5 sm:p-4 bg-emerald-600 text-white rounded-full shadow-xl shadow-emerald-700/30 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center group"
           title="Add Expense"
         >
-          <Plus size={28} className="group-hover:rotate-90 transition-transform duration-200" />
+          <Plus size={26} className="group-hover:rotate-90 transition-transform duration-200" />
         </button>
       </div>
 
-      {/* Modals */}
+      {/* Mobile Bottom Navigation Bar */}
+      <BottomNavBar
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        expenseCount={(currentMonthData.expenses || []).length}
+      />
+
+      {/* Add Expense Modal */}
       {isAddExpenseOpen && (
         <AddExpense
           monthData={currentMonthData}
@@ -629,15 +557,17 @@ export default function App() {
         />
       )}
 
-      {isCategoryManagerOpen && (
-        <CategoryManager
+      {/* Edit Expense Modal */}
+      {editingExpense && (
+        <EditExpenseModal
+          expense={editingExpense}
           monthData={currentMonthData}
-          onUpdate={handleUpdateMonth}
-          onClose={() => setIsCategoryManagerOpen(false)}
-          onResetAll={() => setIsResetConfirmOpen(true)}
+          onSave={handleEditExpense}
+          onClose={() => setEditingExpense(null)}
         />
       )}
 
+      {/* Pocket Money Allowance Modal */}
       {isPocketMoneyModalOpen && (
         <PocketMoneyModal
           currentAmount={currentMonthData.monthlyPocketMoney || 0}
@@ -647,46 +577,40 @@ export default function App() {
         />
       )}
 
-      {isWeeklyAnalysisOpen && (
-        <WeeklyAnalysis
+      {/* Category Manager Modal (when opened from home header or quick action) */}
+      {isCategoryManagerOpen && (
+        <CategoryManager
           monthData={currentMonthData}
-          onClose={() => setIsWeeklyAnalysisOpen(false)}
+          prevMonthData={prevMonthData}
+          prevMonthName={format(parseISO(`${prevMonthKey}-01`), "MMMM")}
+          onUpdate={handleUpdateMonth}
+          onReassignExpenses={handleReassignExpenses}
+          onClose={() => setIsCategoryManagerOpen(false)}
+          onResetAll={() => setIsResetConfirmOpen(true)}
         />
       )}
 
-      {isMonthlyAnalysisOpen && (
-        <MonthlyAnalysis
-          data={data}
-          activeMonthKey={activeMonthKey}
-          onClose={() => setIsMonthlyAnalysisOpen(false)}
-        />
-      )}
-
-      {isYearSummaryOpen && (
-        <YearSummary
-          data={data}
-          onClose={() => setIsYearSummaryOpen(false)}
-        />
-      )}
-
+      {/* Reset Confirmation Modal */}
       <ResetConfirmationModal
         isOpen={isResetConfirmOpen}
         onConfirm={handleResetAll}
         onCancel={() => setIsResetConfirmOpen(false)}
       />
 
+      {/* Auth Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         initialMode={authModalMode}
       />
 
+      {/* Migration Modal */}
       {user && (
         <MigrationModal
           isOpen={isMigrationModalOpen}
           userId={user.uid}
           localData={getInitialData()}
-          onSuccess={(count) => {
+          onSuccess={() => {
             setIsMigrationModalOpen(false);
           }}
           onDismiss={() => setIsMigrationModalOpen(false)}

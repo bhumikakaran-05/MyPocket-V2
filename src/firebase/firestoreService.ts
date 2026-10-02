@@ -8,6 +8,7 @@ import {
   onSnapshot, 
   writeBatch,
   query,
+  where,
   orderBy,
   Unsubscribe
 } from "firebase/firestore";
@@ -19,6 +20,7 @@ export interface FirestoreMonthDoc {
   monthlyPocketMoney: number;
   categoryBudgets: Record<string, number>;
   categoryTypes?: Record<string, CategoryType>;
+  archivedCategories?: string[];
   updatedAt: string;
 }
 
@@ -61,16 +63,20 @@ export async function saveMonthBudget(
   monthKey: string, 
   monthlyPocketMoney: number, 
   categoryBudgets: Record<string, number>,
-  categoryTypes?: Record<string, CategoryType>
+  categoryTypes?: Record<string, CategoryType>,
+  archivedCategories?: string[]
 ): Promise<void> {
   const monthRef = doc(db, "users", userId, "months", monthKey);
   try {
-    await setDoc(monthRef, {
+    const docData: Record<string, any> = {
       monthlyPocketMoney: Number(monthlyPocketMoney || 0),
-      categoryBudgets: categoryBudgets || { ...DEFAULT_CATEGORIES },
-      categoryTypes: categoryTypes || { ...DEFAULT_CATEGORY_TYPES },
+      categoryBudgets: categoryBudgets !== undefined ? categoryBudgets : {},
+      categoryTypes: categoryTypes !== undefined ? categoryTypes : {},
+      archivedCategories: Array.isArray(archivedCategories) ? archivedCategories : [],
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    };
+    // Explicit overwrite (no merge: true) so deleted category keys are properly removed from the Firestore document
+    await setDoc(monthRef, docData);
   } catch (error) {
     throw handleFirestoreError(error, "saveMonthBudget", `users/${userId}/months/${monthKey}`);
   }
@@ -95,6 +101,28 @@ export async function addExpense(userId: string, monthKey: string, expense: Expe
     await setDoc(expenseRef, expenseData);
   } catch (error) {
     throw handleFirestoreError(error, "addExpense", `users/${userId}/months/${monthKey}/expenses/${expense.id}`);
+  }
+}
+
+/**
+ * Updates an existing expense item in /users/{userId}/months/{monthKey}/expenses/{expense.id}
+ */
+export async function updateExpense(userId: string, monthKey: string, expense: Expense): Promise<void> {
+  const expenseRef = doc(db, "users", userId, "months", monthKey, "expenses", expense.id);
+  try {
+    const expenseData: Record<string, any> = {
+      id: expense.id,
+      amount: Number(expense.amount),
+      category: expense.category,
+      date: expense.date,
+      updatedAt: new Date().toISOString()
+    };
+    if (expense.merchant !== undefined) expenseData.merchant = expense.merchant;
+    if (expense.note !== undefined) expenseData.note = expense.note;
+
+    await setDoc(expenseRef, expenseData, { merge: true });
+  } catch (error) {
+    throw handleFirestoreError(error, "updateExpense", `users/${userId}/months/${monthKey}/expenses/${expense.id}`);
   }
 }
 
@@ -127,6 +155,7 @@ export function subscribeToUserAppData(
     monthlyPocketMoney: number;
     categoryBudgets: Record<string, number>;
     categoryTypes?: Record<string, CategoryType>;
+    archivedCategories?: string[];
     expenses: Expense[];
   }> = {};
 
@@ -151,8 +180,9 @@ export function subscribeToUserAppData(
 
       sanitizedMonths[monthKey] = {
         monthlyPocketMoney: pocketMoney,
-        categoryBudgets: mData.categoryBudgets || { ...DEFAULT_CATEGORIES },
-        categoryTypes: mData.categoryTypes || { ...DEFAULT_CATEGORY_TYPES },
+        categoryBudgets: mData.categoryBudgets !== undefined ? mData.categoryBudgets : {},
+        categoryTypes: mData.categoryTypes !== undefined ? mData.categoryTypes : {},
+        archivedCategories: Array.isArray(mData.archivedCategories) ? mData.archivedCategories : [],
         expenses
       };
     });
@@ -179,14 +209,16 @@ export function subscribeToUserAppData(
         if (!localMonthsCache[monthKey]) {
           localMonthsCache[monthKey] = {
             monthlyPocketMoney: Number(data.monthlyPocketMoney || 0),
-            categoryBudgets: data.categoryBudgets || { ...DEFAULT_CATEGORIES },
-            categoryTypes: data.categoryTypes || { ...DEFAULT_CATEGORY_TYPES },
+            categoryBudgets: data.categoryBudgets !== undefined ? data.categoryBudgets : {},
+            categoryTypes: data.categoryTypes !== undefined ? data.categoryTypes : {},
+            archivedCategories: Array.isArray(data.archivedCategories) ? data.archivedCategories : [],
             expenses: []
           };
         } else {
           localMonthsCache[monthKey].monthlyPocketMoney = Number(data.monthlyPocketMoney || 0);
-          localMonthsCache[monthKey].categoryBudgets = data.categoryBudgets || { ...DEFAULT_CATEGORIES };
-          localMonthsCache[monthKey].categoryTypes = data.categoryTypes || { ...DEFAULT_CATEGORY_TYPES };
+          localMonthsCache[monthKey].categoryBudgets = data.categoryBudgets !== undefined ? data.categoryBudgets : {};
+          localMonthsCache[monthKey].categoryTypes = data.categoryTypes !== undefined ? data.categoryTypes : {};
+          localMonthsCache[monthKey].archivedCategories = Array.isArray(data.archivedCategories) ? data.archivedCategories : [];
         }
 
         // Set up real-time listener for this month's expenses subcollection if not already listening
@@ -319,6 +351,31 @@ export async function migrateLocalDataToFirestore(userId: string, localData: App
     return totalExpensesMigrated;
   } catch (error) {
     throw handleFirestoreError(error, "migrateLocalDataToFirestore", `users/${userId}`);
+  }
+}
+
+/**
+ * Safely reassigns all expenses from an old category to a new category in Firestore.
+ */
+export async function reassignCategoryExpenses(
+  userId: string,
+  monthKey: string,
+  fromCategory: string,
+  toCategory: string
+): Promise<void> {
+  try {
+    const expensesRef = collection(db, "users", userId, "months", monthKey, "expenses");
+    const q = query(expensesRef, where("category", "==", fromCategory));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const batch = writeBatch(db);
+      snap.docs.forEach((d) => {
+        batch.update(d.ref, { category: toCategory });
+      });
+      await batch.commit();
+    }
+  } catch (error) {
+    throw handleFirestoreError(error, "reassignCategoryExpenses", `users/${userId}/months/${monthKey}/expenses`);
   }
 }
 
