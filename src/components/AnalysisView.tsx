@@ -73,19 +73,19 @@ export default function AnalysisView({
   }, [categoryBudgets]);
 
   // Unallocated Money = Pocket money that has not been assigned to any category budget
-  const unallocated = Math.max(0, allowance - totalAllocated);
+  const unallocated = allowance - totalAllocated;
 
-  // Saved / Unused Money:
-  // If Total Spent < Monthly Allowance: Saved = Monthly Allowance - Total Spent
-  // If Total Spent >= Monthly Allowance: Saved = 0
-  const saved = allowance > totalSpent ? allowance - totalSpent : 0;
+  // Saved This Month:
+  // If Total Spent < Total Allocated: Saved This Month = Total Allocated - Total Spent
+  // If Total Spent >= Total Allocated: Saved This Month = 0
+  const saved = totalAllocated > totalSpent ? totalAllocated - totalSpent : 0;
 
   // Overspent:
-  // If Total Spent > Monthly Allowance: Overspent = Total Spent - Monthly Allowance
+  // If Total Spent > Total Allocated: Overspent = Total Spent - Total Allocated
   // Otherwise: Overspent = 0
-  const overspent = totalSpent > allowance ? totalSpent - allowance : 0;
+  const overspent = totalSpent > totalAllocated ? totalSpent - totalAllocated : 0;
 
-  const spentPercentage = allowance > 0 ? Math.round((totalSpent / allowance) * 100) : 0;
+  const spentPercentage = totalAllocated > 0 ? Math.round((totalSpent / totalAllocated) * 100) : 0;
 
   // Days calculations for daily burn rate
   const now = new Date();
@@ -101,35 +101,35 @@ export default function AnalysisView({
   // 2. One Concise Monthly Takeaway
   // =========================================================================
   const takeaway = useMemo(() => {
-    if (allowance <= 0 && totalSpent <= 0) {
+    if (totalAllocated <= 0 && totalSpent <= 0) {
       return {
-        text: "Set your monthly pocket money in the Home screen to start tracking your savings.",
+        text: "Set your category budgets in the Budget tab to start tracking your savings.",
         type: "neutral" as const
       };
     }
-    if (allowance <= 0 && totalSpent > 0) {
+    if (totalAllocated <= 0 && totalSpent > 0) {
       return {
-        text: `You have spent ₹${totalSpent.toLocaleString()} this month. Set your monthly allowance to see your savings.`,
+        text: `You have spent ₹${totalSpent.toLocaleString()} this month. Allocate category budgets to track savings.`,
         type: "neutral" as const
       };
     }
     if (overspent > 0) {
       return {
-        text: `You spent ₹${overspent.toLocaleString()} more than your monthly pocket money.`,
+        text: `You spent ₹${overspent.toLocaleString()} more than your allocated budget of ₹${totalAllocated.toLocaleString()}.`,
         type: "negative" as const
       };
     }
-    if (totalSpent === allowance && allowance > 0) {
+    if (totalSpent === totalAllocated && totalAllocated > 0) {
       return {
-        text: `You spent exactly 100% of your pocket money (₹${allowance.toLocaleString()}) with ₹0 left.`,
+        text: `You spent exactly 100% of your allocated budget (₹${totalAllocated.toLocaleString()}) with ₹0 left.`,
         type: "warning" as const
       };
     }
     return {
-      text: `You spent ${spentPercentage}% of your pocket money and have ₹${saved.toLocaleString()} unused.`,
+      text: `You spent ${spentPercentage}% of your allocated budget and saved ₹${saved.toLocaleString()} this month.`,
       type: "positive" as const
     };
-  }, [allowance, totalSpent, overspent, saved, spentPercentage]);
+  }, [totalAllocated, totalSpent, overspent, saved, spentPercentage]);
 
   // =========================================================================
   // 3. Category Performance Analysis (Budget vs Actual)
@@ -332,7 +332,7 @@ export default function AnalysisView({
                   ₹{totalSpent.toLocaleString()}
                 </p>
                 <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">
-                  {allowance > 0 ? `${spentPercentage}% of pocket money` : "All expenses"}
+                  {totalAllocated > 0 ? `${spentPercentage}% of allocated budget` : `${expenses.length} expenses`}
                 </span>
               </div>
 
@@ -360,25 +360,25 @@ export default function AnalysisView({
                   ₹{unallocated.toLocaleString()}
                 </p>
                 <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">
-                  Unassigned buffer
+                  {unallocated >= 0 ? "Allowance buffer" : "Over-allocated"}
                 </span>
               </div>
 
-              {/* Card 5: Saved / Unused Money */}
+              {/* Card 5: Saved This Month */}
               <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200/80 space-y-1">
                 <div className="flex items-center gap-1.5 text-emerald-800">
                   <PiggyBank size={14} className="text-emerald-700" />
-                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">Saved / Unused</span>
+                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">Saved This Month</span>
                 </div>
                 <p className="text-base sm:text-lg font-black text-emerald-700 tracking-tight">
                   ₹{saved.toLocaleString()}
                 </p>
                 <span className="text-[10px] sm:text-[11px] text-emerald-700/80 block truncate">
-                  {saved > 0 ? "Kept in your pocket" : "No unused allowance"}
+                  {saved > 0 ? "Under allocated budget" : "No budget savings"}
                 </span>
               </div>
 
-              {/* Card 6: Overspent Amount */}
+              {/* Card 6: Overspent This Month */}
               <div 
                 className={`p-3.5 rounded-2xl border space-y-1 ${
                   overspent > 0 
@@ -394,7 +394,7 @@ export default function AnalysisView({
                   ₹{overspent.toLocaleString()}
                 </p>
                 <span className={`text-[10px] sm:text-[11px] block truncate ${overspent > 0 ? "text-rose-600" : "text-slate-400"}`}>
-                  {overspent > 0 ? "Above pocket money" : "Within allowance"}
+                  {overspent > 0 ? "Above allocated budget" : "Within allocated budget"}
                 </span>
               </div>
             </div>
@@ -402,7 +402,7 @@ export default function AnalysisView({
             {/* Quick helper note clarifying difference between Unallocated & Saved */}
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
               <span>
-                <strong className="text-slate-700">Note:</strong> Unallocated is money not assigned to budgets. Saved / Unused is unspent cash from your monthly allowance.
+                <strong className="text-slate-700">Note:</strong> Unallocated Money is pocket money not assigned to any category budget. Saved This Month is unspent money from your allocated budget.
               </span>
             </div>
           </div>

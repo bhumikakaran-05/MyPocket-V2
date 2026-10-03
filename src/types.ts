@@ -104,6 +104,7 @@ export interface MonthAnalysisData {
   remaining: number;
   unallocated: number;
   savings: number;
+  overspent: number;
   savingsRate: number;
   highestCategory: { name: string; amount: number } | null;
   overspentCategories: CategoryStat[];

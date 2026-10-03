@@ -127,8 +127,8 @@ export const calculateMonthStats = (monthData: MonthData, monthKey?: string): Mo
     totalDaysInMonth,
     isCurrentMonth,
     categoryStats,
-    monthlySavings: totalBudget > totalSpent ? totalBudget - totalSpent : 0,
-    monthlyOverspent: totalSpent > totalBudget ? totalSpent - totalBudget : 0,
+    monthlySavings: totalAllocated > totalSpent ? totalAllocated - totalSpent : 0,
+    monthlyOverspent: totalSpent > totalAllocated ? totalSpent - totalAllocated : 0,
     fixedSpent,
     fixedBudget,
     variableSpent,
@@ -300,7 +300,7 @@ export const calculateMonthAnalysis = (data: AppData, monthKey: string): MonthAn
   const daysPassed = monthKey === currentMonthKey ? Math.min(daysInMonth, getDate(new Date())) : daysInMonth;
   const averageDailySpending = daysPassed > 0 ? Math.round(stats.totalSpent / daysPassed) : 0;
 
-  const savingsRate = stats.totalBudget > 0 ? Math.round((stats.monthlySavings / stats.totalBudget) * 1000) / 10 : 0;
+  const savingsRate = stats.totalAllocated > 0 ? Math.round((stats.monthlySavings / stats.totalAllocated) * 1000) / 10 : 0;
 
   return {
     monthKey,
@@ -311,6 +311,7 @@ export const calculateMonthAnalysis = (data: AppData, monthKey: string): MonthAn
     remaining: stats.remainingBalance,
     unallocated: stats.unallocated,
     savings: stats.monthlySavings,
+    overspent: stats.monthlyOverspent,
     savingsRate,
     highestCategory,
     overspentCategories,
